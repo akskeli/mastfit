@@ -13,7 +13,7 @@ authors = [
   { name = "Ana Kuzmanic Skelin" },
   { name = "Mirjana Bonkovic" },
   { name = "Mario Milicevic" },
-  { name = "Ratko Mimica" },
+  { name = "Mojmil Cecic" },
 ]
 keywords = ["photogrammetry", "point-cloud", "cylinder-fitting", "structural-health", "UAV"]
 classifiers = [
