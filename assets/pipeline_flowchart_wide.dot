@@ -1,0 +1,119 @@
+/*
+ * mastfit — processing pipeline, compact layout (Figure 2 of the paper)
+ * ------------------------------------------------------------------------------
+ * Same content as pipeline_flowchart.dot, laid out with one row per stage so the
+ * figure fits a single journal text column (5.45 in) with legible 7–8 pt text.
+ * If you change the pipeline, change BOTH .dot files.
+ *
+ * Render:
+ *   python scripts/11_pipeline_flowchart.py --src assets/pipeline_flowchart_wide.dot --dpi 600
+ *   dot -Tpdf assets/pipeline_flowchart_wide.dot -o pipeline_flowchart_wide.pdf
+ *
+ * Numbers (all reproducible, see scripts/12_paper_numbers.py):
+ *   87 → 410 mm    scripts/03_contamination_ablation.py (unsmoothed baseline)
+ *   L = 3 m        scripts/06_sensitivity.py
+ *   20–27 mm       scripts/10_per_mast_accuracy.py (per-mast floor, means)
+ *   ±28–65 mm      scripts/04_crossvalidation.py (95% LoA, transverse–longitudinal)
+ *   36–160 mm      scripts/01_fit_all_masts.py
+ */
+
+digraph mastfit_pipeline_wide {
+
+  graph [
+    rankdir  = TB,
+    bgcolor  = "white",
+    fontname = "Helvetica",
+    nodesep  = 0.22,
+    ranksep  = 0.34,
+    splines  = spline,
+    pad      = 0.12,
+    compound = true,
+    newrank  = true
+  ];
+
+  node [
+    shape     = box,
+    style     = "rounded,filled",
+    fontname  = "Helvetica",
+    fontsize  = 11.5,
+    penwidth  = 1.0,
+    margin    = "0.08,0.06",
+    width     = 1.70,
+    height    = 0.62,
+    fixedsize = false,
+    color     = "#8fa6bb",
+    fillcolor = "white"
+  ];
+
+  edge [color = "#8397a8", penwidth = 1.1, arrowsize = 0.7];
+
+  /* ---------- endpoints ---------- */
+  input [label = <<B>Raw UAV Point Cloud</B><BR/><FONT POINT-SIZE="9.5" COLOR="#c9d6e2">5 masts · ~93k points · segmented</FONT>>,
+         fillcolor = "#2b4257", color = "#2b4257", fontcolor = "white", width = 3.2, height = 0.5];
+  output [label = <<B>Structural-Health Assessment</B><BR/><FONT POINT-SIZE="9.5" COLOR="#c9d6e2">rake 1.2–1.9° · bend 36–160 mm · ovality unresolved</FONT>>,
+          fillcolor = "#2b4257", color = "#2b4257", fontcolor = "white", width = 3.2, height = 0.5];
+
+  /* ---------- Stage I ---------- */
+  subgraph cluster_1 {
+    label = <<B>Stage I</B>&#160;&#160;·&#160;&#160;Robust Fitting>; labeljust = "l"; fontsize = 11; fontcolor = "#4a6c8c";
+    style = "rounded,filled"; fillcolor = "#f6f9fc"; color = "#c3d3e0"; penwidth = 1.1; margin = 8;
+    pca   [label = <<B>PCA Axis Seed</B><BR/><FONT POINT-SIZE="9.5" COLOR="#68798a">covariance<BR/>eigen-decomposition</FONT>>];
+    irls  [label = <<B>Robust Axis<BR/>Refinement</B><BR/><FONT POINT-SIZE="9.5" COLOR="#68798a">IRLS · Tukey biweight</FONT>>];
+    slice [label = <<B>Taper-Aware<BR/>Sectioning</B><BR/><FONT POINT-SIZE="9.5" COLOR="#68798a">100 slices · coverage gate</FONT>>];
+    fit   [label = <<B>Per-Slice Robust<BR/>Circle Fit</B><BR/><FONT POINT-SIZE="9.5" COLOR="#68798a">Taubin + trimmed refit</FONT>>];
+    { rank = same; pca; irls; slice; fit; }
+    pca -> irls -> slice -> fit;
+  }
+
+  /* ---------- Stage II ---------- */
+  subgraph cluster_2 {
+    label = <<B>Stage II</B>&#160;&#160;·&#160;&#160;Contamination>; labeljust = "l"; fontsize = 11; fontcolor = "#1d4d70";
+    style = "rounded,filled"; fillcolor = "#e8f0f7"; color = "#2f6690"; penwidth = 1.5; margin = 8;
+    flare [label = <<B>Base-Flare Removal</B><BR/><FONT POINT-SIZE="9.5" COLOR="#3d6683">taper-consistency test<BR/>unsmoothed: 87 → 410 mm</FONT>>,
+           fillcolor = "#d6e5f1", color = "#2f6690"];
+    band  [label = <<B>Rigging-Band<BR/>Suppression</B><BR/><FONT POINT-SIZE="9.5" COLOR="#3d6683">residual / ovality<BR/>spike detection</FONT>>,
+           fillcolor = "#d6e5f1", color = "#2f6690"];
+    { rank = same; flare; band; }
+    flare -> band;
+  }
+
+  /* ---------- Stage III ---------- */
+  subgraph cluster_3 {
+    label = <<B>Stage III</B>&#160;&#160;·&#160;&#160;Deformation>; labeljust = "l"; fontsize = 11; fontcolor = "#4a6c8c";
+    style = "rounded,filled"; fillcolor = "#f6f9fc"; color = "#c3d3e0"; penwidth = 1.1; margin = 8;
+    centre [label = <<B>As-Built<BR/>Centreline</B><BR/><FONT POINT-SIZE="9.5" COLOR="#68798a">kernel smoother, L = 3 m</FONT>>];
+    axis   [label = <<B>Straight<BR/>Raked Axis</B><BR/><FONT POINT-SIZE="9.5" COLOR="#68798a">least-squares line<BR/>(≈2° design rake)</FONT>>];
+    split  [label = <<B>Rake / Bend<BR/>Decomposition</B><BR/><FONT POINT-SIZE="9.5" COLOR="#68798a">b(z) = c(z) − (c₀ + z·d)</FONT>>];
+    dome   [label = <<B>Five-Mast Shared-<BR/>Curvature Test</B><BR/><FONT POINT-SIZE="9.5" COLOR="#3d6683">shared component →<BR/>candidate bound on doming</FONT>>,
+            fillcolor = "#d6e5f1", color = "#2f6690"];
+    { rank = same; centre; axis; split; dome; }
+    centre -> axis -> split -> dome;
+  }
+
+  /* ---------- Stage IV ---------- */
+  subgraph cluster_4 {
+    label = <<B>Stage IV</B>&#160;&#160;·&#160;&#160;Validation>; labeljust = "l"; fontsize = 11; fontcolor = "#3d6b53";
+    style = "rounded,filled"; fillcolor = "#eef5f0"; color = "#5f9377"; penwidth = 1.3; margin = 8;
+    phantom [label = <<B>Matched Synthetic<BR/>Phantom</B><BR/><FONT POINT-SIZE="9.5" COLOR="#456b57">per-mast floor 20–27 mm</FONT>>,
+             fillcolor = "#dfeee5", color = "#5f9377"];
+    sig     [label = <<B>Significance Test</B><BR/><FONT POINT-SIZE="9.5" COLOR="#456b57">bend vs. straight-mast<BR/>null distribution, 5%</FONT>>,
+             fillcolor = "#dfeee5", color = "#5f9377"];
+    tls     [label = <<B>Independent TLS<BR/>Cross-Validation</B><BR/><FONT POINT-SIZE="9.5" COLOR="#456b57">Bland–Altman<BR/>LoA ±28–65 mm</FONT>>,
+             fillcolor = "#dfeee5", color = "#5f9377"];
+    { rank = same; phantom; sig; tls; }
+    phantom -> sig;
+    sig -> tls [dir = back];
+  }
+
+  /* ---------- column alignment (invisible) ---------- */
+  pca  -> flare -> centre -> phantom [style = invis, weight = 20];
+  slice -> split -> tls              [style = invis, weight = 20];
+  fit  -> dome                       [style = invis, weight = 20];
+
+  /* ---------- stage-to-stage flow (cluster to cluster, second column) ---------- */
+  input -> irls   [lhead = cluster_1, penwidth = 1.5, color = "#2b4257", weight = 20];
+  irls  -> band   [ltail = cluster_1, lhead = cluster_2, penwidth = 1.5, color = "#2b4257", weight = 20];
+  band  -> axis   [ltail = cluster_2, lhead = cluster_3, penwidth = 1.5, color = "#2b4257", weight = 20];
+  axis  -> sig    [ltail = cluster_3, lhead = cluster_4, penwidth = 1.5, color = "#2b4257", weight = 20];
+  sig   -> output [ltail = cluster_4, penwidth = 1.5, color = "#2b4257", weight = 20];
+}

@@ -1,0 +1,28 @@
+# Default parameters for the mast-fitting pipeline.
+# These are the values used for every number reported in the paper.
+
+pipeline:
+  n_slices: 100          # slice count; result is insensitive to this (see 06_sensitivity.py)
+  bandwidth_m: 3.0       # kernel bandwidth L; sets the RESOLVED BENDING WAVELENGTH.
+                         # Report it alongside any bend figure.
+  k_mad: 2.5             # radial-residual trim inside the circle fit (robust scales)
+  kappa: 3.0             # slice-level flare / band rejection threshold (robust scales)
+  min_points_per_slice: 40
+  min_coverage: 0.55     # required angular coverage of the ring (fraction of 12 sectors)
+
+validation:
+  # Per-mast error floor (bending-profile RMSE on matched phantoms under spatially
+  # correlated error; scripts/10_per_mast_accuracy.py, Table 3), bow to stern, in mm.
+  # This is the accuracy of the recovered profile, not a significance threshold:
+  # significance is tested against the null distribution of the total bend
+  # (scripts/15_significance_and_ablations.py --sections B, Table 5).
+  error_floor_mean_mm: [27.1, 20.1, 21.1, 21.0, 20.0]
+  error_floor_p90_mm: [40.1, 29.0, 31.7, 33.2, 34.7]
+  significance_level: 0.05
+  # TLS cross-validation: RMS difference 14 mm (transverse) and 33 mm (longitudinal);
+  # 95% LoA +-28 / +-65 mm (scripts/04_crossvalidation.py).
+
+laser:
+  min_points: 2000       # below this a mast cannot be fitted (the Foremast: ~1.9k)
+  clean_iterations: 3    # per-height-band radial MAD filter passes
+  clean_k_mad: 2.5

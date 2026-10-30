@@ -1,0 +1,176 @@
+/*
+ * mastfit — processing pipeline (Fig. 2 of the paper)
+ * ---------------------------------------------------
+ * This .dot file is the SOURCE OF TRUTH for the diagram. Edit it directly.
+ *
+ * VS Code:
+ *   1. install the extension "Graphviz Interactive Preview" (tintinweb)
+ *   2. open this file
+ *   3. Ctrl/Cmd+Shift+P → "Graphviz Interactive: Preview Graphviz / Dot"
+ *      → live preview, updates as you type
+ *   (the extension "Graphviz (dot) language support" adds syntax highlighting)
+ *
+ * Render to a file:
+ *   dot -Tpng -Gdpi=300 pipeline_flowchart.dot -o pipeline_flowchart.png
+ *   dot -Tpdf            pipeline_flowchart.dot -o pipeline_flowchart.pdf   # vector, for camera-ready
+ *   (or: python scripts/11_pipeline_flowchart.py)
+ *
+ * Layout: change rankdir=TB to rankdir=LR for a wide version.
+ *
+ * Every number below is reproducible:
+ *   87 → 410 mm    scripts/03_contamination_ablation.py (unsmoothed baseline, 40 slices)
+ *   L = 3 m        scripts/06_sensitivity.py
+ *   20–27 mm       scripts/10_per_mast_accuracy.py
+ *   ±28–65 mm      scripts/04_crossvalidation.py (95% LoA, transverse–longitudinal)
+ *   36–160 mm      scripts/01_fit_all_masts.py
+ * If you change the pipeline, change this file (and pipeline_flowchart_wide.dot).
+ */
+
+digraph mastfit_pipeline {
+
+  /* ---------- global style ---------- */
+  graph [
+    rankdir   = TB,
+    bgcolor   = "white",
+    fontname  = "Helvetica",
+    nodesep   = 0.40,
+    ranksep   = 0.55,
+    splines   = spline,
+    pad       = 0.30,
+    compound  = true
+  ];
+
+  node [
+    shape     = box,
+    style     = "rounded,filled",
+    fontname  = "Helvetica",
+    fontsize  = 12,
+    penwidth  = 1.1,
+    margin    = "0.30,0.18",
+    labelloc  = "c",      /* label vertically centred            */
+    width     = 4.7,      /* uniform box width -> tidy column   */
+    fixedsize = false,    /* but never clip a label             */
+    color     = "#8fa6bb",
+    fillcolor = "white"
+  ];
+
+  edge [
+    color     = "#8397a8",
+    penwidth  = 1.2,
+    arrowsize = 0.75
+  ];
+
+  /* ---------- endpoints ---------- */
+  input [
+    label     = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Raw UAV Point Cloud</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#c9d6e2">5 masts · ~93k points · segmented</FONT></TD></TR></TABLE>>,
+    fillcolor = "#2b4257",
+    color     = "#2b4257",
+    fontcolor = "white",
+    penwidth  = 1.6
+  ];
+
+  output [
+    label     = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Structural-Health Assessment</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#c9d6e2">rake 1.2–1.9°  ·  bend 36–160 mm  ·  ovality unresolved</FONT></TD></TR></TABLE>>,
+    fillcolor = "#2b4257",
+    color     = "#2b4257",
+    fontcolor = "white",
+    penwidth  = 1.6
+  ];
+
+  /* ---------- Stage I ---------- */
+  subgraph cluster_1 {
+    label     = <<B>Stage I</B>  ·  Robust Fitting>;
+    labeljust = "l";
+    fontname  = "Helvetica";
+    fontsize  = 13;
+    fontcolor = "#4a6c8c";
+    style     = "rounded,filled";
+    fillcolor = "#f6f9fc";
+    color     = "#c3d3e0";
+    penwidth  = 1.2;
+    margin    = 14;
+
+    pca   [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>PCA Axis Seed</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#68798a">covariance eigen-decomposition</FONT></TD></TR></TABLE>>];
+    irls  [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Robust Axis Refinement</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#68798a">IRLS · Tukey biweight · deterministic</FONT></TD></TR></TABLE>>];
+    slice [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Taper-Aware Sectioning</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#68798a">100 slices · Δ ≈ 0.4–0.5 m · coverage gate</FONT></TD></TR></TABLE>>];
+    fit   [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Per-Slice Robust Circle Fit</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#68798a">Taubin + MAD-trimmed refit</FONT></TD></TR></TABLE>>];
+
+    pca -> irls -> slice -> fit;
+  }
+
+  /* ---------- Stage II ---------- */
+  subgraph cluster_2 {
+    label     = <<B>Stage II</B>  ·  Contamination>;
+    labeljust = "l";
+    fontname  = "Helvetica";
+    fontsize  = 13;
+    fontcolor = "#1d4d70";
+    style     = "rounded,filled";
+    fillcolor = "#e8f0f7";
+    color     = "#2f6690";
+    penwidth  = 1.8;
+    margin    = 14;
+
+    flare [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Base-Flare Removal</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#3d6683">taper-consistency test · unsmoothed: 87 → 410 mm</FONT></TD></TR></TABLE>>,
+           fillcolor = "#d6e5f1", color = "#2f6690"];
+    band  [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Rigging-Band Suppression</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#3d6683">residual / ovality spike detection</FONT></TD></TR></TABLE>>,
+           fillcolor = "#d6e5f1", color = "#2f6690"];
+
+    flare -> band;
+  }
+
+  /* ---------- Stage III ---------- */
+  subgraph cluster_3 {
+    label     = <<B>Stage III</B>  ·  Deformation>;
+    labeljust = "l";
+    fontname  = "Helvetica";
+    fontsize  = 13;
+    fontcolor = "#4a6c8c";
+    style     = "rounded,filled";
+    fillcolor = "#f6f9fc";
+    color     = "#c3d3e0";
+    penwidth  = 1.2;
+    margin    = 14;
+
+    centre [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>As-Built Centreline</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#68798a">kernel smoother, fixed L = 3 m</FONT></TD></TR></TABLE>>];
+    axis   [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Straight Raked Axis</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#68798a">least-squares line · removes ≈2° design rake</FONT></TD></TR></TABLE>>];
+    split  [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Rake / Bend Decomposition</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#68798a">b(z) = c(z) − (c₀ + z·d)</FONT></TD></TR></TABLE>>];
+
+    dome  [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Five-Mast Shared-Curvature Test</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#3d6683">shared component → candidate bound on doming</FONT></TD></TR></TABLE>>,
+           fillcolor = "#d6e5f1", color = "#2f6690"];
+    centre -> axis -> split -> dome;
+  }
+
+  /* ---------- Stage IV ---------- */
+  subgraph cluster_4 {
+    label     = <<B>Stage IV</B>  ·  Validation>;
+    labeljust = "l";
+    fontname  = "Helvetica";
+    fontsize  = 13;
+    fontcolor = "#3d6b53";
+    style     = "rounded,filled";
+    fillcolor = "#eef5f0";
+    color     = "#5f9377";
+    penwidth  = 1.4;
+    margin    = 14;
+
+    phantom [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Matched Synthetic Phantom</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#456b57">matched to the cloud · floor 20–27 mm</FONT></TD></TR></TABLE>>,
+             fillcolor = "#dfeee5", color = "#5f9377"];
+    tls     [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Independent TLS Cross-Validation</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#456b57">Bland–Altman · LoA ±28–65 mm</FONT></TD></TR></TABLE>>,
+             fillcolor = "#dfeee5", color = "#5f9377"];
+    sig     [label = <<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1"><TR><TD ALIGN="CENTER"><B>Significance Test</B></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10" COLOR="#456b57">bend vs. straight-mast null distribution, 5%</FONT></TD></TR></TABLE>>,
+             fillcolor = "#dfeee5", color = "#5f9377"];
+
+    { rank = same; phantom; tls; }
+    phantom -> sig;
+    tls     -> sig;
+  }
+
+  /* ---------- stage-to-stage flow ---------- */
+  input -> pca    [penwidth = 1.6, color = "#2b4257"];
+  fit   -> flare  [penwidth = 1.6, color = "#2b4257"];
+  band  -> centre [penwidth = 1.6, color = "#2b4257"];
+  dome -> phantom [penwidth = 1.6, color = "#2b4257"];
+  dome -> tls     [penwidth = 1.6, color = "#2b4257"];
+  sig   -> output  [penwidth = 1.6, color = "#2b4257"];
+}
