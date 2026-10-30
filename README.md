@@ -147,7 +147,7 @@ pytest -q
   title   = {Self-Referential Generalized-Cylinder Fitting for Mast Deformation
              Measurement from UAV Point Clouds},
   author  = {Kuzmanic Skelin, Ana and Bonkovic, Mirjana and Milicevic, Mario
-             and Mimica, Ratko},
+             and Cecic, Mojmil},
   journal = {Sensors},
   year    = {2026},
   volume  = {26},
